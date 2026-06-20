@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import sqlite3
 import logging
 from typing import List, Dict, Any, Optional

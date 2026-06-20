@@ -1,0 +1,63 @@
+# System Specification: Concierge Dining Advisor
+
+## 1. Overview
+The Concierge Dining Advisor is a multi-agent system designed for the Kaggle "AI Agents: Intensive Vibe Coding Capstone Project". 
+It acts as a personalized dining assistant that tracks user eating habits, synthesizes real-time constraints (location, budget, time, distance), and uses Google Maps API to recommend the best restaurant and menu options. The system features a self-improvement loop where user feedback (accept/reject) updates their historical preferences.
+
+**Target Track:** Concierge Agents
+**Primary Language:** Python
+
+---
+
+## 2. System Architecture
+
+The architecture consists of four main components:
+1. **Frontend UI:** An interactive web interface (Streamlit or Gradio) allowing users to input constraints and chat with the agent.
+2. **Agent 1 (Dietary Preference Manager):** The orchestrator agent. Interacts with the user, manages memory, and handles the self-improvement loop.
+3. **Agent 2 (Restaurant Matcher):** The execution agent. Specialized in querying the Google Maps API efficiently based on precise criteria.
+4. **Database MCP Server:** A local Model Context Protocol (MCP) server managing an SQLite database to store user profiles, dining history, and preference vectors.
+
+---
+
+## 3. Database & MCP Server Specification
+
+The MCP Server provides tools for Agent 1 to read and write user preferences.
+We will use an SQLite database (`dining_history.db`) managed via the `mcp` Python SDK (FastMCP).
+
+**Schema Draft:**
+- `users`: `user_id`, `name`, `general_preferences`
+- `dining_history`: `record_id`, `user_id`, `restaurant_name`, `food_type`, `price`, `timestamp`, `user_rating` (accept/reject), `feedback_reason`
+
+**MCP Tools Provided:**
+- `get_user_profile(user_id)`
+- `get_recent_history(user_id, limit)`
+- `record_feedback(user_id, restaurant_data, feedback_reason)`
+
+---
+
+## 4. API Integration & Cost Control
+
+**Language Models:**
+- **Gemini API (`google-genai`):** Used as the brain for both Agent 1 and Agent 2. 
+- *Cost Control:* We will use `gemini-2.5-flash` for Agent 2 (faster, cheaper for parsing JSON and API results) and `gemini-2.5-pro` (or flash depending on complexity) for Agent 1 (requires better reasoning for user intent and history synthesis).
+
+**Google Maps API:**
+- **Places API (New or Legacy):** Used for `Text Search` or `Nearby Search` to find restaurants.
+- **Distance Matrix API:** Used to verify the "within X minutes driving" constraint.
+- *Cost Control:* 
+  - Agent 2 will perform a broad Places API search first.
+  - It will filter results locally (in Python) based on basic criteria (rating, price level) before calling the more expensive Distance Matrix API to verify driving time.
+  - Results for generic queries will be cached locally in a simple dictionary to avoid duplicate API calls during the same session.
+
+---
+
+## 5. UI & Deployment
+
+**Web Framework:** Streamlit (`streamlit` package)
+- Provides a clean, chat-based interface (`st.chat_message`).
+- Allows sidebar configuration for API keys, user simulation selection, and current location mock.
+
+**Deployment & Sync:**
+- The project will be initialized as a Git repository.
+- Code will be pushed to a public GitHub repository to fulfill Kaggle competition requirements.
+- The Streamlit app can be deployed to Streamlit Community Cloud or run locally within a Kaggle Notebook using a tunneling tool (e.g., `localtunnel` or `ngrok`) for demonstration.

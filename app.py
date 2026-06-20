@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 import streamlit as st
 import json
@@ -27,7 +27,8 @@ MODEL_NAME = "gemini-2.5-flash"
 
 # Initialize Gemini Client
 try:
-    gemini_client = genai.Client()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    gemini_client = genai.Client(api_key=api_key) if api_key else genai.Client()
 except Exception as e:
     logger.error(f"Failed to initialize Gemini Client: {e}")
     gemini_client = None

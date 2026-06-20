@@ -88,17 +88,16 @@ def run_agent1_planning(user_input: str, user_id: str) -> dict:
     if not gemini_client:
         return {"status": "error", "message": "Gemini Client not initialized. Check API Key."}
         
-    response = gemini_client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=SearchCriteria,
-            temperature=0.1
-        )
-    )
-    
     try:
+        response = gemini_client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=SearchCriteria,
+                temperature=0.1
+            )
+        )
         criteria = json.loads(response.text)
         if criteria.get("security_flag"):
             st.session_state.trajectory.append("Agent 1: SECURITY ALERT. Prompt Injection detected.")
@@ -107,7 +106,7 @@ def run_agent1_planning(user_input: str, user_id: str) -> dict:
         st.session_state.trajectory.append(f"Agent 1: Generated criteria: {criteria}")
         return {"status": "success", "criteria": criteria}
     except Exception as e:
-        return {"status": "error", "message": f"Agent 1 Planning failed: {e}"}
+        return {"status": "error", "message": f"Agent 1 Planning failed (API Error): {e}"}
 
 def run_agent2_execution(criteria: dict) -> dict:
     """Agent 2: Executes Map API, analyzes raw results, outputs final Recommendation JSON."""
@@ -137,22 +136,21 @@ def run_agent2_execution(criteria: dict) -> dict:
     Translate all output text (recommended_menu, reason) to Traditional Chinese (zh-TW).
     """
     
-    response = gemini_client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=RestaurantRecommendation,
-            temperature=0.2
-        )
-    )
-    
     try:
+        response = gemini_client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=RestaurantRecommendation,
+                temperature=0.2
+            )
+        )
         rec = json.loads(response.text)
         st.session_state.trajectory.append(f"Agent 2: Final Selection: {rec['restaurant_name']}")
         return {"status": "success", "recommendation": rec}
     except Exception as e:
-        return {"status": "error", "message": f"Agent 2 Execution failed: {e}"}
+        return {"status": "error", "message": f"Agent 2 Execution failed (API Error): {e}"}
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Concierge Dining Advisor", layout="wide")

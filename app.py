@@ -213,97 +213,108 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
     except Exception as e:
         return {"status": "error", "message": f"Agent 2 Query Gen failed: {e}"}
         
-    map_results = map_search.search_google_maps(map_query)
-    if "error" in map_results:
-        return {"status": "needs_more_info", "reason": f"Map Search Failed: {map_results['error']}"}
+    map_response = map_search.search_google_maps(map_query)
+    if "error" in map_response:
+        return {"status": "needs_more_info", "reason": f"Map Search Failed: {map_response['error']}"}
         
-    st.session_state.trajectory.append(f"Agent 2: Found restaurant {map_results.get('name')}")
+    places_list = map_response.get("results", [])
+    all_reasons = []
     
-    today_index = datetime.datetime.today().weekday()
-    hours_list = map_results.get('opening_hours', [])
-    todays_hours = hours_list[today_index] if today_index < len(hours_list) else "Unknown opening hours today"
-    
-    photo_parts = []
-    photo_urls_mapping = ""
-    maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
-    
-    for i, p_name in enumerate(map_results.get("photo_names", [])[:2]): 
-        bytes_data = map_search.fetch_photo_bytes(p_name)
-        if bytes_data:
-            photo_parts.append(types.Part.from_bytes(data=bytes_data, mime_type="image/jpeg"))
-            public_url = f"https://places.googleapis.com/v1/{p_name}/media?maxWidthPx=800&key={maps_api_key}"
-            photo_urls_mapping += f"\nImage {i+1} Public URL: {public_url}"
-            
-    current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    analysis_prompt = f"""
-    You are Agent 2. You have retrieved the following restaurant data from Google Maps API (New):
-    Name: {map_results.get('name')}
-    Address: {map_results.get('address')}
-    Phone: {map_results.get('phone_number')}
-    Today's Hours: {todays_hours}
-    Current Local Time: {current_time_str}
-    Maps URL: {map_results.get('google_maps_uri')}
-    Top Reviews: {map_results.get('reviews')}
-    
-    Agent 1's Briefing:
-    {agent1_briefing}
-    
-    Task:
-    1. STRICT VERIFICATION: Verify if the restaurant TRULY matches Agent 1's core requirements. Critically, you MUST check the "Today's Hours" against the "Current Local Time" and consider the travel time mentioned in Agent 1's briefing. Ensure the restaurant will still be open and serving food by the time the user arrives. If it is closed, will close too soon, or drastically fails other requirements (e.g., all-you-can-eat, specific food type), output ONLY this tag: [REJECT_AND_ASK_AGENT1: <Reason why it failed>]. Do not output anything else.
-    2. Analyze the {len(photo_parts)} menu/food photos provided. Here are their public URLs: {photo_urls_mapping}
-    3. If the photos are insufficient to find exact prices for the 3 menus, use your `google_search` tool to search for "{map_results.get('name')} menu prices".
-    4. Output a detailed text summary of the Top 3 menus and their exact prices.
-    5. Provide your reasoning based on Agent 1's briefing (strictly limit reasoning to under 50 words).
-    6. If you cannot find exact prices from web or photos, and one of the images provided is a Menu, specify its Public URL so we can show it to the user.
-    """
-    
-    contents = [analysis_prompt] + photo_parts
-    
-    try:
-        analysis_response = gemini_client.models.generate_content(
-            model=MODEL_NAME,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                tools=[{"google_search": {}}],
-                temperature=0.2
-            )
-        )
-        raw_analysis = analysis_response.text
+    for map_results in places_list:
+        st.session_state.trajectory.append(f"Agent 2: Evaluating restaurant {map_results.get('name')}")
         
-        if "[REJECT_AND_ASK_AGENT1:" in raw_analysis:
-            match = re.search(r'\[REJECT_AND_ASK_AGENT1:\s*(.*?)\]', raw_analysis, re.DOTALL)
-            reason = match.group(1).strip() if match else "Restaurant does not meet core requirements"
-            st.session_state.trajectory.append(f"Agent 2 Rejected result. Reason: {reason}")
-            return {"status": "needs_more_info", "reason": reason}
+        today_index = datetime.datetime.today().weekday()
+        hours_list = map_results.get('opening_hours', [])
+        todays_hours = hours_list[today_index] if today_index < len(hours_list) else "Unknown opening hours today"
         
-        format_prompt = f"""
-        Format the following restaurant analysis into the required JSON schema.
-        Restaurant Name: {map_results.get('name')}
-        Google Maps URL: {map_results.get('google_maps_uri')}
+        photo_parts = []
+        photo_urls_mapping = ""
+        maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+        
+        for i, p_name in enumerate(map_results.get("photo_names", [])[:2]): 
+            bytes_data = map_search.fetch_photo_bytes(p_name)
+            if bytes_data:
+                photo_parts.append(types.Part.from_bytes(data=bytes_data, mime_type="image/jpeg"))
+                public_url = f"https://places.googleapis.com/v1/{p_name}/media?maxWidthPx=800&key={maps_api_key}"
+                photo_urls_mapping += f"\nImage {i+1} Public URL: {public_url}"
+                
+        current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        analysis_prompt = f"""
+        You are Agent 2. You have retrieved the following restaurant data from Google Maps API (New):
+        Name: {map_results.get('name')}
+        Address: {map_results.get('address')}
         Phone: {map_results.get('phone_number')}
         Today's Hours: {todays_hours}
-        Reviews: {map_results.get('reviews')}
+        Current Local Time: {current_time_str}
+        Maps URL: {map_results.get('google_maps_uri')}
+        Top Reviews: {map_results.get('reviews')}
         
-        Detailed Analysis (contains menus, prices, reasoning, and optional menu_photo_url):
-        {raw_analysis}
+        Agent 1's Briefing:
+        {agent1_briefing}
+        
+        Task:
+        1. STRICT VERIFICATION: Verify if the restaurant TRULY matches Agent 1's core requirements. Critically, you MUST check the "Today's Hours" against the "Current Local Time" and consider the travel time mentioned in Agent 1's briefing. Ensure the restaurant will still be open and serving food by the time the user arrives. If it is closed, will close too soon, or drastically fails other requirements (e.g., all-you-can-eat, specific food type), output ONLY this tag: [REJECT_AND_ASK_AGENT1: <Reason why it failed>]. Do not output anything else.
+        2. Analyze the {len(photo_parts)} menu/food photos provided. Here are their public URLs: {photo_urls_mapping}
+        3. If the photos are insufficient to find exact prices for the 3 menus, use your `google_search` tool to search for "{map_results.get('name')} menu prices".
+        4. Output a detailed text summary of the Top 3 menus and their exact prices.
+        5. Provide your reasoning based on Agent 1's briefing (strictly limit reasoning to under 50 words).
+        6. If you cannot find exact prices from web or photos, and one of the images provided is a Menu, specify its Public URL so we can show it to the user.
         """
         
-        format_response = gemini_client.models.generate_content(
-            model=MODEL_NAME,
-            contents=format_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=RichRestaurantRecommendation,
-                temperature=0.1
-            )
-        )
+        contents = [analysis_prompt] + photo_parts
         
-        rec = json.loads(format_response.text)
-        st.session_state.trajectory.append(f"Agent 2: Final Selection: {rec['restaurant_name']}")
-        return {"status": "success", "recommendation": rec}
-    except Exception as e:
-        return {"status": "error", "message": f"Agent 2 Execution failed: {e}"}
+        try:
+            analysis_response = gemini_client.models.generate_content(
+                model=MODEL_NAME,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],
+                    temperature=0.2
+                )
+            )
+            raw_analysis = analysis_response.text
+            
+            if "[REJECT_AND_ASK_AGENT1:" in raw_analysis:
+                match = re.search(r'\[REJECT_AND_ASK_AGENT1:\s*(.*?)\]', raw_analysis, re.DOTALL)
+                reason = match.group(1).strip() if match else "Restaurant does not meet core requirements"
+                st.session_state.trajectory.append(f"Agent 2 Rejected '{map_results.get('name')}'. Reason: {reason}")
+                all_reasons.append(f"{map_results.get('name')} failed because: {reason}")
+                continue # Try next restaurant
+            
+            format_prompt = f"""
+            Format the following restaurant analysis into the required JSON schema.
+            Restaurant Name: {map_results.get('name')}
+            Google Maps URL: {map_results.get('google_maps_uri')}
+            Phone: {map_results.get('phone_number')}
+            Today's Hours: {todays_hours}
+            Reviews: {map_results.get('reviews')}
+            
+            Detailed Analysis (contains menus, prices, reasoning, and optional menu_photo_url):
+            {raw_analysis}
+            """
+            
+            format_response = gemini_client.models.generate_content(
+                model=MODEL_NAME,
+                contents=format_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=RichRestaurantRecommendation,
+                    temperature=0.1
+                )
+            )
+            
+            rec = json.loads(format_response.text)
+            st.session_state.trajectory.append(f"Agent 2: Final Selection: {rec['restaurant_name']}")
+            return {"status": "success", "recommendation": rec}
+        except Exception as e:
+            logger.error(f"Error evaluating {map_results.get('name')}: {e}")
+            all_reasons.append(f"{map_results.get('name')} evaluation failed with error: {str(e)}")
+            continue
+
+    # If the loop finishes, all restaurants failed
+    combined_reasons = " | ".join(all_reasons)
+    return {"status": "needs_more_info", "reason": f"Tried {len(places_list)} restaurants but all failed. Reasons: {combined_reasons}"}
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Concierge Dining Advisor", layout="wide")

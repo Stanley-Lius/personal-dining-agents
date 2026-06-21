@@ -46,37 +46,29 @@ def search_google_maps(text_query: str) -> Dict[str, Any]:
         if not places:
             return {"error": "No restaurants found."}
             
-        # Compare and find the best match out of the 5
-        best_place = None
-        best_score = -1.0
-        
         for place in places:
             rating = place.get("rating", 0.0)
             count = place.get("userRatingCount", 0)
             # Bayesian-like heuristic: rating * log10(count + 1)
-            score = rating * math.log10(count + 1)
+            place['score'] = rating * math.log10(count + 1)
             
-            if score > best_score:
-                best_score = score
-                best_place = place
-                
-        if not best_place:
-            best_place = places[0]
+        sorted_places = sorted(places, key=lambda x: x['score'], reverse=True)
         
-        # Format the response
-        result = {
-            "name": best_place.get("displayName", {}).get("text", "Unknown"),
-            "address": best_place.get("formattedAddress", "Unknown"),
-            "price_level": best_place.get("priceLevel", "Unknown"),
-            "rating": best_place.get("rating", "Unknown"),
-            "user_rating_count": best_place.get("userRatingCount", "Unknown"),
-            "phone_number": best_place.get("nationalPhoneNumber", "Unknown"),
-            "google_maps_uri": best_place.get("googleMapsUri", "Unknown"),
-            "opening_hours": best_place.get("regularOpeningHours", {}).get("weekdayDescriptions", []),
-            "reviews": [rev.get("text", {}).get("text", "") for rev in best_place.get("reviews", [])[:3]], # top 3 reviews
-            "photo_names": [photo.get("name") for photo in best_place.get("photos", [])[:5]] # get top 5 photo references
-        }
-        return result
+        results = []
+        for best_place in sorted_places:
+            results.append({
+                "name": best_place.get("displayName", {}).get("text", "Unknown"),
+                "address": best_place.get("formattedAddress", "Unknown"),
+                "price_level": best_place.get("priceLevel", "Unknown"),
+                "rating": best_place.get("rating", "Unknown"),
+                "user_rating_count": best_place.get("userRatingCount", "Unknown"),
+                "phone_number": best_place.get("nationalPhoneNumber", "Unknown"),
+                "google_maps_uri": best_place.get("googleMapsUri", "Unknown"),
+                "opening_hours": best_place.get("regularOpeningHours", {}).get("weekdayDescriptions", []),
+                "reviews": [rev.get("text", {}).get("text", "") for rev in best_place.get("reviews", [])[:3]], # top 3 reviews
+                "photo_names": [photo.get("name") for photo in best_place.get("photos", [])[:5]] # get top 5 photo references
+            })
+        return {"results": results}
     except Exception as e:
         logger.error(f"Places API New failed: {e}")
         return {"error": str(e)}

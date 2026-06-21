@@ -55,7 +55,7 @@ This project is designed for seamless deployment on **Streamlit Community Cloud*
 ### Local Setup
 ```bash
 # Clone the repository
-git clone https://github.com/Stanley-Lius/Agents.git
+git clone [https://github.com/Stanley-Lius/Agents.git](https://github.com/Stanley-Lius/personal-dining-agents.git)
 cd agent
 
 # Install dependencies

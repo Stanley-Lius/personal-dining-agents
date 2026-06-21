@@ -317,7 +317,7 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
     return {"status": "needs_more_info", "reason": f"Tried {len(places_list)} restaurants but all failed. Reasons: {combined_reasons}"}
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="Concierge Dining Advisor", layout="wide")
+st.set_page_config(page_title="Personal Dining Advisor", layout="wide")
 
 if "trajectory" not in st.session_state:
     st.session_state.trajectory = []
@@ -330,7 +330,7 @@ if "system_message" not in st.session_state:
 if "current_request" not in st.session_state:
     st.session_state.current_request = None
 
-st.title("🍽️ Concierge Dining Advisor")
+st.title("🍽️Personal Dining Advisor")
 st.markdown("Powered by Multi-Agent Auto-Correction & Feedback Loops")
 
 if st.session_state.system_message:

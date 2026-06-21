@@ -4,50 +4,58 @@ An autonomous multi-agent dining concierge designed for the **Kaggle AI Agents: 
 
 **Kaggle Username:** w550954
 
-## 🚀 The Vision: Vibe Coding meets Agentic Engineering
+---
 
-This project is built from the ground up focusing on rapid prototyping, seamless flow, and agentic orchestration (Vibe Coding). Rather than writing every piece of logic imperatively, the system relies on specialized AI agents orchestrating dynamic context handling, tool use, and self-improvement loops.
+## 🚀 The Pitch: Why Agents?
 
-### Key Agentic Patterns Implemented
-1. **Multi-Agent Orchestration**: 
-   - **Agent 1 (The Planner)**: Handles user interaction, memory synthesis, and high-level goal planning. It distinguishes between *hard* constraints (explicit user requests) and *soft* constraints (inferred from past data).
-   - **Agent 2 (The Executor)**: Specialized in querying external APIs (Google Maps) and visually analyzing menus to verify if real-world constraints (like current time and travel distance) are met.
-2. **Context Memory & Self-Improvement Loop**: 
-   The system utilizes an **MCP (Model Context Protocol) SQLite Database Server** to persist user interactions. When a user accepts or rejects a recommendation, Agent 1 actively rewrites a Markdown preference profile ensuring the agent gets smarter over time.
-3. **Auto-Correction & Reflection (Fallback Loop)**: 
-   If Agent 2 discovers a restaurant is closed upon arrival or doesn't match the criteria, it explicitly rejects the finding. Agent 2 then **iterates through a fallback list of the top 5 best-matching restaurants** before ultimately asking Agent 1 to re-plan with relaxed constraints if all candidates fail.
-4. **State Management & Reset**: 
-   The UI provides a direct control to reset the database and Markdown memory profiles while maintaining the underlying schema formats, demonstrating robust user data lifecycle control.
-5. **Transparent Trajectory Tracing**:
-   The web UI features a real-time `Trajectory` sidebar that logs the internal thoughts, actions, and rejections of both agents. This provides deep visibility into the agentic workflow, helping users understand exactly how the system dynamically evaluates and arrives at its final decision.
+### The Problem
+Finding a restaurant is easy; finding one that fits your real-time constraints (open now, 10 mins away) *and* your unstated personal vibes (doesn't like loud places, hates cilantro) is incredibly hard. Standard filtering algorithms fail at fuzzy constraints and cannot dynamically reason about the trade-offs of real-world dining.
+
+### The Solution
+We built a multi-agent system that acts like a human concierge. It doesn't just filter; it *evaluates*. It can visually read a menu photo to check exact prices, synthesize past dining rejections into future preferences, and self-correct when it realizes a proposed restaurant will close before you arrive.
+
+## 🧠 Key Agentic Concepts Demonstrated
+
+This project directly addresses the Hackathon rubric by applying the following concepts:
+
+1. **Agent / Multi-agent system**: 
+   - **Agent 1 (The Planner)**: Handles user interaction, synthesizes memory, and creates high-level goals. It distinguishes between *hard* constraints (explicit user requests) and *soft* constraints (inferred from past data).
+   - **Agent 2 (The Executor)**: Specialized in querying external APIs (Google Maps) and visually analyzing menus to verify if real-world constraints are strictly met.
+2. **MCP Server**: 
+   - Built a local **Model Context Protocol (FastMCP) Server** connecting an SQLite database to give Agent 1 long-term memory of dining history and feedback.
+3. **Agent Skills / Tools Use**: 
+   - Agents are equipped with tools to query Google Maps, visually analyze photos, and search the web for menu prices.
+4. **Deployability**: 
+   - Seamlessly deployable via Streamlit Community Cloud with a Dev Container setup for easy local reproduction.
+
+## 🧗 The Build Journey: Challenges & Solutions
+
+Building autonomous agents for real-world tasks presents unique challenges. Here is how we solved them using an agentic approach:
+
+### Challenge 1: The "Closed Upon Arrival" Problem
+APIs often return places that match a query but close in 10 minutes. Early iterations of the agent recommended closed restaurants.
+* **Solution (Fallback Loop)**: We implemented a strict verification step in Agent 2. It fetches the top 5 places and strictly compares "Today's Hours" against "Current Local Time" + "Travel Time". If a restaurant fails, Agent 2 autonomously rejects it and evaluates the next option without bothering the user. If all 5 fail, it triggers Agent 1 to re-plan.
+
+### Challenge 2: Context Window Bloat
+Feeding the user's entire dining history into the prompt for every query was inefficient and expensive.
+* **Solution (Dual-Memory System)**: We built a local **MCP Server** with SQLite to retrieve only the 3 most recent interactions for short-term context. For long-term context, Agent 1 organically rewrites a concise Markdown preference profile whenever the user accepts or rejects a recommendation. 
+
+### Challenge 3: Finding Exact Prices
+Standard APIs rarely return accurate menu prices, usually just returning a generic `$$` indicator.
+* **Solution (Visual Tooling)**: We gave Agent 2 the ability to fetch restaurant menu photos from Google Maps and analyze them using Gemini Vision to extract exact dish prices. If the photos are unreadable, it falls back to a `google_search` tool.
 
 ## 🛠️ System Architecture
 
 - **Frontend**: Streamlit (Chat-based UI designed for real-time vibe interactions)
-- **AI Brain**: Google Gemini 2.5 (Flash/Pro) via `google-genai` SDK
-- **Data & Tools Integration**: Model Context Protocol (FastMCP) serving an SQLite database.
-- **External APIs**: Google Maps Places API (New) for real-time location, opening hours, reviews, and visual menu analysis.
+- **AI Brain**: Google Gemini 2.5 via `google-genai` SDK
+- **Data & Tools Integration**: FastMCP serving an SQLite database.
+- **External APIs**: Google Maps Places API (New) for real-time location, hours, reviews, and images.
 
-### Directory Structure
-```text
-.
-├── app.py                      # Main Streamlit Orchestration
-├── requirements.txt            # System dependencies
-├── README.md                   
-├── /src                        # Core agent logic and tools
-│   ├── map_search.py           # Google Maps API Integration
-│   ├── utils.py                # Preference synthesis tools
-│   └── db_mcp_server.py        # FastMCP Database Server
-├── /data                       # Local persistent context
-│   ├── dev_dining_history.db   # SQLite Memory
-│   └── user_preferences_*.md   # Markdown profiles
-├── /specs                      # Technical documentation
-└── /docs                       # Reference documents
-```
+### Noteworthy UI Features
+- **Transparent Trajectory Tracing**: A real-time sidebar logs the internal thoughts, actions, and rejections of both agents, providing deep visibility into the system's dynamic decision-making.
+- **State Management & Reset**: Direct controls to edit the Markdown memory profile or reset the database entirely, demonstrating robust user data lifecycle control.
 
-## 💻 Quick Start & Deployment
-
-This project is designed for seamless deployment on **Streamlit Community Cloud** and **GitHub Pages**.
+## 💻 Quick Start
 
 ### Prerequisites
 1. Python >= 3.10
@@ -56,16 +64,8 @@ This project is designed for seamless deployment on **Streamlit Community Cloud*
 
 ### Local Setup
 ```bash
-# Clone the repository
 git clone https://github.com/Stanley-Lius/personal-dining-agents.git
 cd agent
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the application
 streamlit run app.py
 ```
-
-## 🏆 Hackathon Focus
-This project directly addresses the capstone requirements by integrating a custom MCP server, leveraging advanced prompt engineering (reflection and explicit reasoning constraints), and adopting an agile, vibe-coding approach to build a highly personal, location-aware agent.

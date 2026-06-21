@@ -19,16 +19,18 @@ The architecture consists of four main components:
 
 ---
 
-## 3. Database & MCP Server Specification
+## 3. Dual-Memory System: MCP Server & Markdown Profiles
 
-The MCP Server provides tools for Agent 1 to read and write user preferences.
-We will use an SQLite database (`dining_history.db`) managed via the `mcp` Python SDK (FastMCP).
+To solve the challenge of context window bloat when feeding an entire dining history to the LLM, we implemented a dual-memory architecture:
 
-**Schema Draft:**
+1. **Short-Term Context (SQLite via MCP)**: 
+   The local Model Context Protocol (MCP) Server provides tools for Agent 1 to read/write recent interactions. We fetch only the `limit=3` most recent records to maintain conversational continuity.
+2. **Long-Term Memory (Markdown Profiles)**: 
+   Whenever the user accepts or rejects a restaurant, the system updates a concise Markdown profile (`user_preferences_*.md`). This organically synthesizes overriding dietary habits into a lean text file, ensuring the agent gets smarter over time without exploding the prompt size.
+
+**SQLite Schema Draft:**
 - `users`: `user_id`, `name`, `general_preferences`
 - `dining_history`: `record_id`, `user_id`, `restaurant_name`, `food_type`, `price`, `timestamp`, `user_rating` (accept/reject), `feedback_reason`
-
-**Null value:** Information not provided by the user is always set to null in the database.
 
 **MCP Tools Provided:**
 - `get_user_profile(user_id)`

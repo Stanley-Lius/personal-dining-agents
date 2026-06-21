@@ -13,7 +13,7 @@ This project is built from the ground up focusing on rapid prototyping, seamless
    - **Agent 1 (The Planner)**: Handles user interaction, memory synthesis, and high-level goal planning. It distinguishes between *hard* constraints (explicit user requests) and *soft* constraints (inferred from past data).
    - **Agent 2 (The Executor)**: Specialized in querying external APIs (Google Maps) and visually analyzing menus to verify if real-world constraints (like current time and travel distance) are met.
 2. **Context Memory & Self-Improvement Loop**: 
-   The system utilizes an **MCP (Model Context Protocol) SQLite Database Server** to persist user interactions. When a user accepts or rejects a recommendation, Agent 1 actively rewrites a Markdown preference profile (`user_preferences_<id>.md`) ensuring the agent gets smarter over time.
+   The system utilizes an **MCP (Model Context Protocol) SQLite Database Server** to persist user interactions. When a user accepts or rejects a recommendation, Agent 1 actively rewrites a Markdown preference profile ensuring the agent gets smarter over time.
 3. **Auto-Correction & Reflection**: 
    If Agent 2 discovers a restaurant is closed upon arrival, it explicitly rejects the finding and asks Agent 1 to re-plan with relaxed constraints.
 

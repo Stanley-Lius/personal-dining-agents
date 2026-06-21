@@ -116,7 +116,7 @@ def update_user_preferences_markdown(context_update: str):
     except Exception as e:
         logger.error(f"Failed to update Markdown: {e}")
 
-def run_agent1_planning(user_input: str, db_history: str, is_rejection: bool = False) -> dict:
+def run_agent1_planning(original_request: str, db_history: str, is_rejection: bool = False, rejection_reason: str = None) -> dict:
     if not gemini_client:
         return {"status": "error", "message": "Gemini Client not initialized."}
         
@@ -129,7 +129,8 @@ def run_agent1_planning(user_input: str, db_history: str, is_rejection: bool = F
     Context Type: {context_type}
     Current Local Time: {current_time}
     
-    User Input / Rejection Reason: "{user_input}"
+    Original User Input (Contains HARD CONSTRAINTS): "{original_request}"
+    Rejection Reason (If any): "{rejection_reason}"
     
     User Markdown Preferences:
     {markdown_prefs}
@@ -138,10 +139,14 @@ def run_agent1_planning(user_input: str, db_history: str, is_rejection: bool = F
     {db_history}
     
     Task: 
-    1. Understand the user's intent, current constraints, and historical preferences.
-    2. RULE ON MISSING INFO & MEMORY: If the user's input is missing key constraints (e.g., location, budget, travel time/method), you MUST infer them from the Recent DB History and Markdown Preferences. For example: if location is missing, use their most frequently visited location; if budget is missing, use their average past budget; if travel time is missing, use an estimated average from past records. 
-    3. STRICT RULE ON EXPLICIT CONSTRAINTS: If the user PROVIDES explicit constraints (e.g., specific location, budget, or time), you MUST strictly adhere to them. Do not let past memory override or overly influence the decision. EVEN IF this is a REJECTION and you are relaxing constraints, prioritize the user's explicitly stated constraints and do not automatically revert to past memory.
-    4. If the information provided is completely insufficient to make a basic search even with history, or you need to clarify a critical constraint, output ONLY this tag: [ASK_USER: <your question here>]
+    1. CATEGORIZE CONSTRAINTS:
+       - HARD CONSTRAINTS: Any explicit condition provided by the user in the CURRENT input (e.g., specific location, food type, time, budget). These are ABSOLUTE and UNBREAKABLE.
+       - SOFT CONSTRAINTS: Any missing dimension inferred from the user's past DB history or Markdown preferences.
+    2. INFERRING MISSING INFO: For any missing dimension (location, budget, time, food), intelligently infer a SOFT CONSTRAINT from past records (e.g., average budget, most frequented area, usual food types).
+    3. STRICT HARD CONSTRAINT PRESERVATION: You are STRICTLY FORBIDDEN from modifying, replacing, or expanding any HARD CONSTRAINT using past memory. If a hard constraint is a location, it stays locked to that location. If it's a food, only search for that food. Do NOT blend past memory into explicit current requests.
+    4. RELAXATION PROTOCOL (REJECTION ONLY): If this is a REJECTION and you must propose relaxed constraints to broaden the search:
+       - You may ONLY relax or drop SOFT CONSTRAINTS.
+       - If keeping all HARD CONSTRAINTS makes the search impossible or returns no results, you MUST NOT guess or swap them. Instead, you MUST immediately output the [ASK_USER: <question>] tag to ask the user which hard constraint they are willing to compromise on.
     5. Output a natural language briefing directed to Agent 2. The brief MUST clearly specify what Agent 2 needs to search for on Google Maps, and MUST include the estimated travel time and the Current Local Time so Agent 2 can check opening hours. Do NOT output JSON. Write a clear, conversational instruction.
     """
     
@@ -297,6 +302,8 @@ if "agent1_briefing" not in st.session_state:
     st.session_state.agent1_briefing = None
 if "system_message" not in st.session_state:
     st.session_state.system_message = None
+if "current_request" not in st.session_state:
+    st.session_state.current_request = None
 
 st.title("🍽️ Concierge Dining Advisor")
 st.markdown("Powered by Multi-Agent Auto-Correction & Feedback Loops")
@@ -307,6 +314,7 @@ if st.session_state.system_message:
 user_input = st.chat_input("請輸入您的用餐需求...")
 
 if user_input:
+    st.session_state.current_request = user_input
     st.session_state.trajectory.append(f"User: {user_input}")
     st.session_state.current_recommendation = None # clear old
     st.session_state.system_message = None # clear old message
@@ -316,7 +324,7 @@ if user_input:
         st.session_state.trajectory.append("System: Fetched DB History.")
         
     with st.spinner("Agent 1 is planning and updating preferences..."):
-        a1_result = run_agent1_planning(user_input, db_history, is_rejection=False)
+        a1_result = run_agent1_planning(st.session_state.current_request, db_history, is_rejection=False)
         
     if a1_result["status"] == "error":
         st.session_state.system_message = a1_result["message"]
@@ -332,7 +340,7 @@ if user_input:
             
         if a2_result["status"] == "needs_more_info":
             with st.spinner(f"🔄 **找到的餐廳不符要求 ({a2_result['reason']})，正在請 Agent 1 重新規劃條件...**"):
-                a1_result_retry = run_agent1_planning(f"Agent 2 rejected the finding because: {a2_result['reason']}. Please propose a broader or different search constraint. If impossible, ask the user.", db_history, is_rejection=True)
+                a1_result_retry = run_agent1_planning(st.session_state.current_request, db_history, is_rejection=True, rejection_reason=f"Agent 2 rejected the finding because: {a2_result['reason']}. Please propose a broader or different search constraint. If impossible, ask the user.")
                 
                 if a1_result_retry["status"] == "ask_user":
                     st.session_state.system_message = f"🤔 **助理需要您的協助:**\n\n{a1_result_retry['message']}"
@@ -405,7 +413,7 @@ if st.session_state.current_recommendation:
             
             with st.spinner("Agent 1 is re-planning with relaxed constraints..."):
                 db_history = asyncio.run(fetch_db_history())
-                a1_result = run_agent1_planning(f"I rejected the previous suggestion because: {rejection_reason}. Please offer a relaxed or alternative proposal.", db_history, is_rejection=True)
+                a1_result = run_agent1_planning(st.session_state.current_request, db_history, is_rejection=True, rejection_reason=f"I rejected the previous suggestion because: {rejection_reason}. Please offer a relaxed or alternative proposal.")
                 
                 if a1_result["status"] == "success":
                     st.session_state.agent1_briefing = a1_result["briefing"]

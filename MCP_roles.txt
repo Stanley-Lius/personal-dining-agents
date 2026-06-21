@@ -1,0 +1,40 @@
+Vibe Coder Toolkit: Best Practices for MCP Consumption
+To maintain speed without sacrificing stability, vibe coders should adhere to the following
+guidelines when consuming MCP servers:
+✅Do's (Best Practices)
+• Do audit public servers before connection: Always review the code of publicly available,
+open-source MCP servers before attaching them to an agent that has access to your local
+file system or credentials.
+• Do use RAG for tools: Keep your agent's context window clean. Dynamically load tools
+from a registry only when needed, and drop them from context when the task is complete
+to prevent attention dilution.
+• Do leverage internal API Gateways and registries: If possible, rely on internal tool
+registries. This ensures you are consuming approved, governed data schemas rather than
+reinventing the wheel or running unvetted code.
+• Do use the MCP Inspector: When an agent hallucinates a tool call with their arguments,
+use the MCP Inspector or Chrome DevTools to look at the raw transport data rather than
+blindly tweaking the agent's system prompt.
+• Do include HITL: Show tool inputs to the user before calling the server, to avoid malicious
+or accidental data exfiltration
+• Do auditing needs: Log tool usage for audit purposes
+❌Don'ts (Common Pitfalls)
+• Don't build if you can consume: Resist the urge to write custom REST API wrappers.
+Search for an existing MCP server first to maintain the "universal outlet" philosophy.
+• Don't use public, unverified MCPs in production: Open-source MCP servers are fantastic
+for weekend prototypes, but they carry security and reliability risks. Do not tie core
+business logic to unverified public endpoints or API wrapper code.
+• Don't hardcode credentials: During the Configuration phase, never paste API keys or auth
+tokens directly into your agent's prompt or local scripts. Rely on environment variables to
+pass credentials to the MCP server.
+• Don't connect to production: Use the MCP server with a development project, not
+production. LLMs are great at helping design and test applications, so leverage them in a
+safe environment without exposing real data. Be sure that your development environment
+contains non-production data (or obfuscated data).
+• Don’t use it for updates: If you must connect to real data, set the server to read-only
+mode, which executes all queries as a read-only.
+• Don’t provide wide access to all the Projects: Scope your MCP server to a specific project,
+limiting access to only that project's resources where necessary and possible.
+Now we have learnt how to enable vibecoders to leverage the MCP tools for their AI Agent
+building, but AI agent building goes beyond tools, it is to enable users to bring interoperability
+across the ecosystem of applications. We will review how Agent interoperability works in the
+next section.

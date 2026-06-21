@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 import requests
 import logging
+import math
 from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
@@ -28,12 +29,12 @@ def search_google_maps(text_query: str) -> Dict[str, Any]:
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.priceLevel,places.reviews,places.nationalPhoneNumber,places.regularOpeningHours,places.googleMapsUri,places.photos"
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.priceLevel,places.reviews,places.nationalPhoneNumber,places.regularOpeningHours,places.googleMapsUri,places.photos,places.rating,places.userRatingCount"
     }
     
     payload = {
         "textQuery": text_query,
-        "maxResultCount": 3
+        "maxResultCount": 5
     }
     
     try:
@@ -45,14 +46,30 @@ def search_google_maps(text_query: str) -> Dict[str, Any]:
         if not places:
             return {"error": "No restaurants found."}
             
-        # Return the best match (first one)
-        best_place = places[0]
+        # Compare and find the best match out of the 5
+        best_place = None
+        best_score = -1.0
+        
+        for place in places:
+            rating = place.get("rating", 0.0)
+            count = place.get("userRatingCount", 0)
+            # Bayesian-like heuristic: rating * log10(count + 1)
+            score = rating * math.log10(count + 1)
+            
+            if score > best_score:
+                best_score = score
+                best_place = place
+                
+        if not best_place:
+            best_place = places[0]
         
         # Format the response
         result = {
             "name": best_place.get("displayName", {}).get("text", "Unknown"),
             "address": best_place.get("formattedAddress", "Unknown"),
             "price_level": best_place.get("priceLevel", "Unknown"),
+            "rating": best_place.get("rating", "Unknown"),
+            "user_rating_count": best_place.get("userRatingCount", "Unknown"),
             "phone_number": best_place.get("nationalPhoneNumber", "Unknown"),
             "google_maps_uri": best_place.get("googleMapsUri", "Unknown"),
             "opening_hours": best_place.get("regularOpeningHours", {}).get("weekdayDescriptions", []),

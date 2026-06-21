@@ -17,7 +17,7 @@ logger = logging.getLogger("DB_MCP_Server")
 # --- Environment Variable & DB Configuration ---
 # Complying with: "Don't hardcode credentials" & "Development Data Only"
 # We default to a clearly named dev database if the environment variable is not set.
-DB_PATH = os.environ.get("DINING_DB_PATH", "dev_dining_history.db")
+DB_PATH = os.environ.get("DINING_DB_PATH", "data/dev_dining_history.db")
 
 # Initialize the FastMCP Server
 # This is the most stable and official way to build MCP servers in Python.

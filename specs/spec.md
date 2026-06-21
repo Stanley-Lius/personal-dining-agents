@@ -59,7 +59,13 @@ We will use an SQLite database (`dining_history.db`) managed via the `mcp` Pytho
 - Provides a clean, chat-based interface (`st.chat_message`).
 - Allows sidebar configuration for API keys, user simulation selection, and current location mock.
 
+**Directory Structure:**
+- `app.py`: Main Streamlit interface
+- `src/`: Core agent logic, Google Maps integration, and MCP server
+- `data/`: Local SQLite database and Markdown preference profiles
+- `specs/` & `docs/`: System specs and documentation files
+
 **Deployment & Sync:**
-- The project will be initialized as a Git repository.
-- Code will be pushed to a public GitHub repository to fulfill Kaggle competition requirements.
-- The Streamlit app can be deployed to Streamlit Community Cloud or run locally within a Kaggle Notebook using a tunneling tool (e.g., `localtunnel` or `ngrok`) for demonstration.
+- The project will be initialized as a Git repository and pushed to GitHub.
+- The Streamlit app is intended to be deployed on Streamlit Community Cloud.
+- A GitHub Page will be used to present project documentation and results for Kaggle Hackathon judges.

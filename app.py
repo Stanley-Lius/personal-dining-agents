@@ -17,8 +17,8 @@ from google import genai
 from google.genai import types
 
 # Local tools
-import map_search
-import utils
+from src import map_search
+from src import utils
 
 # --- Configuration & Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(message)s')
@@ -52,7 +52,7 @@ class RichRestaurantRecommendation(BaseModel):
     todays_hours: str
     useful_reviews: list[str]
     top_3_menus: list[MenuRecommendation]
-    agent2_reasoning: str = Field(description="Recommendation reasoning. Strictly under 50 Chinese characters.")
+    agent2_reasoning: str = Field(description="Recommendation reasoning. Strictly under 50 words.")
     menu_photo_url: str | None = Field(default=None, description="URL of the menu photo if exact prices were not found.")
 
 # --- Core Logic ---
@@ -60,7 +60,7 @@ class RichRestaurantRecommendation(BaseModel):
 async def fetch_db_history() -> str:
     server_params = StdioServerParameters(
         command="python",
-        args=["db_mcp_server.py"],
+        args=["src/db_mcp_server.py"],
         env=os.environ.copy()
     )
     try:
@@ -78,7 +78,7 @@ async def fetch_db_history() -> str:
 async def write_db_feedback(feedback_text: str, rating: int):
     server_params = StdioServerParameters(
         command="python",
-        args=["db_mcp_server.py"],
+        args=["src/db_mcp_server.py"],
         env=os.environ.copy()
     )
     try:
@@ -167,7 +167,7 @@ def run_agent1_planning(original_request: str, db_history: str, is_rejection: bo
             
         if "[ASK_USER:" in briefing:
             match = re.search(r'\[ASK_USER:\s*(.*?)\]', briefing, re.DOTALL)
-            question = match.group(1).strip() if match else "請問您有更具體的需求嗎？"
+            question = match.group(1).strip() if match else "Do you have any more specific requirements?"
             st.session_state.trajectory.append(f"Agent 1 asks User: {question}")
             return {"status": "ask_user", "message": question}
             
@@ -207,7 +207,7 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
     
     today_index = datetime.datetime.today().weekday()
     hours_list = map_results.get('opening_hours', [])
-    todays_hours = hours_list[today_index] if today_index < len(hours_list) else "今日營業時間未知"
+    todays_hours = hours_list[today_index] if today_index < len(hours_list) else "Unknown opening hours today"
     
     photo_parts = []
     photo_urls_mapping = ""
@@ -240,7 +240,7 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
     2. Analyze the {len(photo_parts)} menu/food photos provided. Here are their public URLs: {photo_urls_mapping}
     3. If the photos are insufficient to find exact prices for the 3 menus, use your `google_search` tool to search for "{map_results.get('name')} menu prices".
     4. Output a detailed text summary of the Top 3 menus and their exact prices.
-    5. Provide your reasoning based on Agent 1's briefing (strictly limit reasoning to under 50 Chinese characters).
+    5. Provide your reasoning based on Agent 1's briefing (strictly limit reasoning to under 50 words).
     6. If you cannot find exact prices from web or photos, and one of the images provided is a Menu, specify its Public URL so we can show it to the user.
     """
     
@@ -259,7 +259,7 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
         
         if "[REJECT_AND_ASK_AGENT1:" in raw_analysis:
             match = re.search(r'\[REJECT_AND_ASK_AGENT1:\s*(.*?)\]', raw_analysis, re.DOTALL)
-            reason = match.group(1).strip() if match else "餐廳不符合核心需求"
+            reason = match.group(1).strip() if match else "Restaurant does not meet core requirements"
             st.session_state.trajectory.append(f"Agent 2 Rejected result. Reason: {reason}")
             return {"status": "needs_more_info", "reason": reason}
         
@@ -311,7 +311,7 @@ st.markdown("Powered by Multi-Agent Auto-Correction & Feedback Loops")
 if st.session_state.system_message:
     st.warning(st.session_state.system_message)
 
-user_input = st.chat_input("請輸入您的用餐需求...")
+user_input = st.chat_input("Please enter your dining preferences...")
 
 if user_input:
     st.session_state.current_request = user_input
@@ -330,7 +330,7 @@ if user_input:
         st.session_state.system_message = a1_result["message"]
         st.rerun()
     elif a1_result["status"] == "ask_user":
-        st.session_state.system_message = f"🤔 **助理需要更多資訊:**\n\n{a1_result['message']}"
+        st.session_state.system_message = f"🤔 **Assistant needs more information:**\n\n{a1_result['message']}"
         st.rerun()
     else:
         st.session_state.agent1_briefing = a1_result["briefing"]
@@ -339,11 +339,11 @@ if user_input:
             a2_result = run_agent2_execution(st.session_state.agent1_briefing)
             
         if a2_result["status"] == "needs_more_info":
-            with st.spinner(f"🔄 **找到的餐廳不符要求 ({a2_result['reason']})，正在請 Agent 1 重新規劃條件...**"):
+            with st.spinner(f"🔄 **Restaurant found does not meet requirements ({a2_result['reason']}), asking Agent 1 to re-plan...**"):
                 a1_result_retry = run_agent1_planning(st.session_state.current_request, db_history, is_rejection=True, rejection_reason=f"Agent 2 rejected the finding because: {a2_result['reason']}. Please propose a broader or different search constraint. If impossible, ask the user.")
                 
                 if a1_result_retry["status"] == "ask_user":
-                    st.session_state.system_message = f"🤔 **助理需要您的協助:**\n\n{a1_result_retry['message']}"
+                    st.session_state.system_message = f"🤔 **Assistant needs your help:**\n\n{a1_result_retry['message']}"
                     st.rerun()
                 elif a1_result_retry["status"] == "success":
                     with st.spinner("Agent 2 is searching again with new constraints..."):
@@ -352,7 +352,7 @@ if user_input:
                             st.session_state.current_recommendation = a2_result_retry["recommendation"]
                             st.rerun()
                         elif a2_result_retry["status"] == "needs_more_info":
-                             st.session_state.system_message = "❌ 抱歉，即使放寬條件仍然找不到合適的餐廳。請嘗試更換地點或條件。"
+                             st.session_state.system_message = "❌ Sorry, even after relaxing constraints, no suitable restaurant was found. Please try a different location or constraint."
                              st.rerun()
                         else:
                              st.session_state.system_message = a2_result_retry.get("message", "Error executing agent 2 retry")
@@ -371,42 +371,42 @@ if user_input:
 if st.session_state.current_recommendation:
     rec = st.session_state.current_recommendation
     
-    st.success(f"### 🎉 推薦餐廳：{rec['restaurant_name']}")
-    st.markdown(f"**📍 導航:** [Google Maps]({rec['google_maps_url']}) | **📞 電話:** {rec['phone_number']}")
-    st.markdown(f"**🕒 今日營業時間:** {rec['todays_hours']}")
-    st.markdown(f"**💡 推薦理由:** {rec['agent2_reasoning']}")
+    st.success(f"### 🎉 Recommended Restaurant: {rec['restaurant_name']}")
+    st.markdown(f"**📍 Navigation:** [Google Maps]({rec['google_maps_url']}) | **📞 Phone:** {rec['phone_number']}")
+    st.markdown(f"**🕒 Today's Hours:** {rec['todays_hours']}")
+    st.markdown(f"**💡 Reason for Recommendation:** {rec['agent2_reasoning']}")
         
-    st.markdown("#### 🗣️ 精選評論")
+    st.markdown("#### 🗣️ Selected Reviews")
     for r in rec['useful_reviews']:
         st.info(f'"{r}"')
         
-    st.markdown("#### 🍽️ 推薦菜色與精確價位")
+    st.markdown("#### 🍽️ Recommended Dishes & Exact Prices")
     cols = st.columns(3)
     for idx, menu in enumerate(rec['top_3_menus']):
         with cols[idx]:
             st.warning(f"**{menu['dish_name']}**\n\n💰 {menu['exact_price']}\n\n_{menu['description']}_")
             
     if rec.get('menu_photo_url'):
-        st.markdown("#### 📸 最新菜單參考")
-        st.image(rec['menu_photo_url'], caption="餐廳菜單", use_container_width=True)
+        st.markdown("#### 📸 Latest Menu Reference")
+        st.image(rec['menu_photo_url'], caption="Restaurant Menu", use_container_width=True)
     
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("##### 為這次的推薦評分 (0-5星)")
+        st.markdown("##### Rate this recommendation (0-5 stars)")
         rating = st.feedback("stars")
         if rating is not None:
             actual_rating = rating + 1 
-            st.write(f"您給了 {actual_rating} 顆星！正在更新您的喜好紀錄...")
+            st.write(f"You gave {actual_rating} stars! Updating your preferences...")
             asyncio.run(write_db_feedback(f"Accepted {rec['restaurant_name']}", actual_rating))
             update_user_preferences_markdown(f"User rated the recommendation '{rec['restaurant_name']}' {actual_rating} out of 5 stars.")
             st.session_state.current_recommendation = None 
             st.rerun()
             
     with col2:
-        st.markdown("##### 或者重新規劃")
-        rejection_reason = st.text_input("告訴我們哪裡不滿意？(選填)")
-        if st.button("❌ 拒絕並重新規劃 (放寬條件)"):
+        st.markdown("##### Or Re-plan")
+        rejection_reason = st.text_input("Tell us what you didn't like (Optional)")
+        if st.button("❌ Reject and Re-plan (Relax Constraints)"):
             feedback_str = f"Rejected: {rec['restaurant_name']}. Reason: {rejection_reason}"
             st.session_state.trajectory.append(f"User {feedback_str}")
             update_user_preferences_markdown(feedback_str)
@@ -425,7 +425,7 @@ if st.session_state.current_recommendation:
                             st.rerun()
                         elif a2_result["status"] == "needs_more_info":
                             st.session_state.current_recommendation = None
-                            st.session_state.system_message = "❌ 抱歉，即使放寬條件仍然找不到合適的餐廳。請嘗試更換地點或條件。"
+                            st.session_state.system_message = "❌ Sorry, even after relaxing constraints, no suitable restaurant was found. Please try a different location or constraint."
                             st.rerun()
                         else:
                             st.session_state.current_recommendation = None
@@ -433,7 +433,7 @@ if st.session_state.current_recommendation:
                             st.rerun()
                 elif a1_result["status"] == "ask_user":
                     st.session_state.current_recommendation = None
-                    st.session_state.system_message = f"🤔 **助理需要您的協助:**\n\n{a1_result['message']}"
+                    st.session_state.system_message = f"🤔 **Assistant needs your help:**\n\n{a1_result['message']}"
                     st.rerun()
                 else:
                     st.session_state.current_recommendation = None

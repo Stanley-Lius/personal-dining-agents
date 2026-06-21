@@ -14,6 +14,8 @@
 *   炸雞排 (Fried Chicken Cutlet)
 *   甘梅地瓜 (Plum Powder Sweet Potato)
 *   脆多汁甘梅薯條 (Crispy, Juicy Plum Powder Sweet Potato Fries)
+*   米糕 (Rice Pudding/Cake)
+*   味泉米糕
 
 **Disliked Foods/Items:**
 *   忠孝夜市廣式滷味

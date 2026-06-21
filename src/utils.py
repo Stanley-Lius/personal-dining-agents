@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_markdown_filename(user_id: str) -> str:
-    return f"user_preferences_{user_id}.md"
+    return f"data/user_preferences_{user_id}.md"
 
 def load_user_markdown(user_id: str) -> str:
     """Loads the user's preference markdown file. Returns an empty string if it doesn't exist."""

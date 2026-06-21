@@ -198,8 +198,8 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
         if bytes_data:
             photo_parts.append(types.Part.from_bytes(data=bytes_data, mime_type="image/jpeg"))
             
-    # Step 4: Final Rich Output with Multimodal + Web Search
-    final_prompt = f"""
+    # Step 4a: Multimodal + Web Search (No JSON)
+    analysis_prompt = f"""
     You are Agent 2. You have retrieved the following restaurant data from Google Maps API (New):
     Name: {map_results.get('name')}
     Address: {map_results.get('address')}
@@ -212,25 +212,49 @@ def run_agent2_execution(agent1_briefing: str) -> dict:
     {agent1_briefing}
     
     Task:
-    1. I have provided {len(photo_parts)} menu/food photos from the restaurant (if any). Analyze them to find exact dish prices.
-    2. If the photos are insufficient, use your `google_search` tool to search for "{map_results.get('name')} menu prices".
-    3. Output the final recommendation strictly matching the JSON schema. YOU MUST include exact prices for the 3 menus.
+    1. Analyze the {len(photo_parts)} menu/food photos provided.
+    2. If the photos are insufficient to find exact prices for the 3 menus, use your `google_search` tool to search for "{map_results.get('name')} menu prices".
+    3. Output a detailed text summary of the Top 3 menus and their exact prices, and your reasoning based on Agent 1's briefing.
     """
     
-    contents = [final_prompt] + photo_parts
+    contents = [analysis_prompt] + photo_parts
     
     try:
-        response = gemini_client.models.generate_content(
+        # 4a: Tools, NO JSON
+        analysis_response = gemini_client.models.generate_content(
             model=MODEL_NAME,
             contents=contents,
             config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=RichRestaurantRecommendation,
                 tools=[{"google_search": {}}],
                 temperature=0.2
             )
         )
-        rec = json.loads(response.text)
+        raw_analysis = analysis_response.text
+        
+        # Step 4b: JSON Formatting (No Tools)
+        format_prompt = f"""
+        Format the following restaurant analysis into the required JSON schema.
+        Restaurant Name: {map_results.get('name')}
+        Google Maps URL: {map_results.get('google_maps_uri')}
+        Phone: {map_results.get('phone_number')}
+        Hours: {map_results.get('opening_hours')}
+        Reviews: {map_results.get('reviews')}
+        
+        Detailed Analysis (contains menus, prices, and reasoning):
+        {raw_analysis}
+        """
+        
+        format_response = gemini_client.models.generate_content(
+            model=MODEL_NAME,
+            contents=format_prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=RichRestaurantRecommendation,
+                temperature=0.1
+            )
+        )
+        
+        rec = json.loads(format_response.text)
         st.session_state.trajectory.append(f"Agent 2: Final Selection: {rec['restaurant_name']}")
         return {"status": "success", "recommendation": rec}
     except Exception as e:

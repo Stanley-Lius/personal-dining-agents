@@ -53,7 +53,7 @@ This project is designed for seamless deployment on **Streamlit Community Cloud*
 ### Local Setup
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/Stanley-Lius/Agents.git
 cd agent
 
 # Install dependencies
